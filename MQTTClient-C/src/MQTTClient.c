@@ -258,6 +258,7 @@ int cycle(MQTTClient* c, Timer* timer)
 {
     int len = 0,
         rc = SUCCESS;
+    Timer send_timer;
 
     int packet_type = readPacket(c, timer);     /* read the socket, see what work is due */
 
@@ -294,7 +295,11 @@ int cycle(MQTTClient* c, Timer* timer)
                 if (len <= 0)
                     rc = FAILURE;
                 else
+                {
+                    TimerInit(&send_timer);
+                    TimerCountdownMS(&send_timer, 200);
                     rc = sendPacket(c, len, timer);
+                }
                 if (rc == FAILURE)
                     goto exit; // there was a problem
             }
@@ -310,8 +315,13 @@ int cycle(MQTTClient* c, Timer* timer)
             else if ((len = MQTTSerialize_ack(c->buf, c->buf_size,
                 (packet_type == PUBREC) ? PUBREL : PUBCOMP, 0, mypacketid)) <= 0)
                 rc = FAILURE;
-            else if ((rc = sendPacket(c, len, timer)) != SUCCESS) // send the PUBREL packet
-                rc = FAILURE; // there was a problem
+            else
+            {
+                TimerInit(&send_timer);
+                TimerCountdownMS(&send_timer, 200);
+                if ((rc = sendPacket(c, len, timer)) != SUCCESS) // send the PUBREL packet
+                    rc = FAILURE; // there was a problem
+            }
             if (rc == FAILURE)
                 goto exit; // there was a problem
             break;
